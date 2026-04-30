@@ -1,5 +1,4 @@
 ### Nodes
-
 resource "aws_instance" "control_plane" {
   ami              = "${var.ami_id}"
   instance_type    = "${var.control_plane_type}"
@@ -14,6 +13,7 @@ resource "aws_instance" "control_plane" {
   })
 
   vpc_security_group_ids = [aws_security_group.control_plane_sg.id]
+  iam_instance_profile   = aws_iam_instance_profile.telekemp_instance_profile.name
 
   tags = {
     Name = "${var.control_plane_name}"
@@ -36,6 +36,7 @@ resource "aws_instance" "worker" {
 
   #associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.worker_sg.id]
+  iam_instance_profile        = aws_iam_instance_profile.telekemp_instance_profile.name
 
   tags = {
     Name = "${var.worker_name}-${format("%02d", count.index + 1)}"
@@ -43,7 +44,6 @@ resource "aws_instance" "worker" {
 }
 
 ### Security Groups
-
 resource "aws_security_group" "control_plane_sg" {
   name        = "${var.control_plane_name}-sg"
   vpc_id      = var.vpc_id
@@ -109,7 +109,6 @@ resource "aws_security_group" "worker_sg" {
 }
 
 ### Individual SG Rules (avoids cyclic dependency)
-
 # Allow all traffic from Worker Security Group
 resource "aws_security_group_rule" "from_worker" {
   type              = "ingress"
@@ -130,4 +129,56 @@ resource "aws_security_group_rule" "from_control_plane" {
   source_security_group_id = aws_security_group.control_plane_sg.id
 
   security_group_id = aws_security_group.worker_sg.id
+}
+
+### IAM
+resource "aws_iam_role" "secrets_role" {
+  name = "${var.control_plane_name}-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "secrets_rw_policy" {
+  name        = "${var.control_plane_name}-rw-policy"
+  description = "Allow read/write access to Secrets Manager."
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:CreateSecret",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:ListSecrets"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "attach_secrets_policy" {
+  role       = aws_iam_role.secrets_role.name
+  policy_arn = aws_iam_policy.secrets_rw_policy.arn
+}
+
+resource "aws_iam_instance_profile" "telekemp_instance_profile" {
+  name = "${var.control_plane_name}-profile"
+  role = aws_iam_role.secrets_role.name
 }

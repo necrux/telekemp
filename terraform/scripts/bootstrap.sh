@@ -5,6 +5,16 @@ set -eo pipefail
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 echo -e "\nStarting user_data script...\n"
 
+# Set node status.
+apt-get update
+apt-get install -y awscli
+
+if [ "${CONTROL_PLANE}" == "true" ]; then
+  aws secretsmanager put-secret-value \
+    --secret-id control-plane-connection-info \
+    --secret-string '{"Status": "Offline"}'
+fi
+
 KUBE_VERSION="${KUBE_VERSION}"
 CALICO_VERSION="${CALICO_VERSION}"
 POD_CIDR="${POD_CIDR}"
@@ -18,7 +28,6 @@ for package in $${KUBE_PACKAGES}; do
 done
 
 # Package prep.
-apt-get update
 apt-get upgrade -y
 apt-get install -y $${BASE_PACKAGES}
 
@@ -59,17 +68,45 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
   echo -e "\nConfiguring the Control Plane...\n"
 
   kubeadm init \
-    --ignore-preflight-errors=Mem \
     --pod-network-cidr=$${POD_CIDR} \
     --cri-socket=unix:///run/containerd/containerd.sock
 
-  export KUBECONFIG=/etc/kubernetes/admin.conf
+  # Store connection info in Secrets Manager
+  CP_ADDRESS=$(awk '/^kubeadm join/ {print $3}' /var/log/user-data.log)
+  CP_TOKEN=$(awk '/^kubeadm join/ {print $5}' /var/log/user-data.log)
+  CP_HASH=$(awk '/--discovery-token-ca-cert-hash/ {print $2}' /var/log/user-data.log)
+
+  echo "{\"Address\": \"$${CP_ADDRESS}\",\"Token\": \"$${CP_TOKEN}\", \"Hash\": \"$${CP_HASH}\",\"Status\": \"Online\"}" > /kube_connection_info.json
+
+  # Configure Kube
   KUBE_USER="ubuntu"
   mkdir -p /home/$${KUBE_USER}/.kube
   cp -i /etc/kubernetes/admin.conf /home/$${KUBE_USER}/.kube/config
   chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
 
   # Install calcio
-  kubectl apply -f \
-    https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
+  kubectl apply \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
+
+  # Upload connection info -- mark node Online
+  aws secretsmanager put-secret-value \
+    --secret-id control-plane-connection-info \
+    --secret-string file:///kube_connection_info.json
+else
+  while true; do
+    NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Status)
+
+    if [ "$${NODE_STATUS}" != "Online" ]; then
+      sleep 5
+    else
+      CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Address)
+      CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Token)
+      CP_HASH=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Hash)
+
+      kubeadm join $${CP_ADDRESS} \
+        --token $${CP_TOKEN} \
+        --discovery-token-ca-cert-hash $${CP_HASH}
+    fi
+  done
 fi
