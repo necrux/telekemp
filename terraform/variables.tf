@@ -24,7 +24,7 @@ variable "subnets" {
 }
 
 #--------------------------------------------------------------
-# k8s
+# k8s - Build
 #--------------------------------------------------------------
 
 variable "ami_id" { default = "ami-0fe18bc3cfa53a248" }
@@ -35,7 +35,6 @@ variable "control_plane_type" { default = "m7i-flex.large" }
 variable "worker_name"  { default = "telekemp-worker" }
 variable "worker_type"  { default = "t3.small" }
 variable "worker_count" { default = 2 }
-
 
 variable "kube_version"   { default = "1.33.11-1.1" }
 variable "calico_version" { default = "3.31.5" }
@@ -50,6 +49,7 @@ variable "base_packages" {
     "gpg"
   ]
 }
+
 variable "kube_packages" {
   default = [
     "kubelet",
@@ -59,5 +59,9 @@ variable "kube_packages" {
 }
 
 #--------------------------------------------------------------
-# Products
+# k8s - Configuration
 #--------------------------------------------------------------
+
+variable "namespace"    { default = "telekemp" }
+variable "support_team" { default = "telekemp-support" }
+variable "dev_team"     { default = "telekemp-devs" }

@@ -9,7 +9,10 @@ resource "aws_instance" "control_plane" {
     CALICO_VERSION = var.calico_version,
     POD_CIDR       = var.pod_cidr,
     BASE_PACKAGES  = join(" ", var.base_packages),
-    KUBE_PACKAGES  = join(" ", var.kube_packages)
+    KUBE_PACKAGES  = join(" ", var.kube_packages),
+    NAMESPACE      = var.namespace,
+    DEV_ROLE       = var.dev_team,
+    SUPPORT_ROLE   = var.support_team
   })
 
   vpc_security_group_ids = [aws_security_group.control_plane_sg.id]
@@ -31,7 +34,10 @@ resource "aws_instance" "worker" {
     CALICO_VERSION = var.calico_version,
     POD_CIDR       = var.pod_cidr,
     BASE_PACKAGES  = join(" ", var.base_packages),
-    KUBE_PACKAGES  = join(" ", var.kube_packages)
+    KUBE_PACKAGES  = join(" ", var.kube_packages),
+    NAMESPACE      = var.namespace,
+    DEV_ROLE       = var.dev_team,
+    SUPPORT_ROLE   = var.support_team
   })
 
   #associate_public_ip_address = false

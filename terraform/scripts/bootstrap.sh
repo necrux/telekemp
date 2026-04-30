@@ -16,6 +16,34 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --secret-string '{"Status": "Offline"}'
 fi
 
+function dev-role {
+cat << EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ${NAMESPACE}
+  name: ${DEV_ROLE}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["*"]
+EOF
+}
+
+function support-role {
+cat << EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ${NAMESPACE}
+  name: ${SUPPORT_ROLE}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list"]
+EOF
+}
+
 KUBE_VERSION="${KUBE_VERSION}"
 CALICO_VERSION="${CALICO_VERSION}"
 POD_CIDR="${POD_CIDR}"
@@ -79,13 +107,13 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
 
   echo "{\"Address\": \"$${CP_ADDRESS}\",\"Token\": \"$${CP_TOKEN}\", \"Hash\": \"$${CP_HASH}\",\"Status\": \"Online\"}" > /kube_connection_info.json
 
-  # Configure Kube
+  # Configure Kube Cluster
   KUBE_USER="ubuntu"
   mkdir -p /home/$${KUBE_USER}/.kube
   cp -i /etc/kubernetes/admin.conf /home/$${KUBE_USER}/.kube/config
   chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
 
-  # Install calcio
+  # Install Calcio
   kubectl apply \
     --kubeconfig=/etc/kubernetes/admin.conf \
     -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
@@ -106,6 +134,30 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
   aws secretsmanager put-secret-value \
     --secret-id control-plane-connection-info \
     --secret-string file:///kube_connection_info.json
+
+  # Configure Kube Namespace(s)
+  kubectl \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    create \
+    namespace ${NAMESPACE}
+
+  kubectl \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    apply -f <(dev-role)
+  kubectl \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    apply -f <(support-role)
+
+  kubectl \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    create rolebinding ${DEV_ROLE}-binding \
+    --role=${DEV_ROLE} \
+    --namespace=${NAMESPACE}
+  kubectl \
+    --kubeconfig=/etc/kubernetes/admin.conf \
+    create rolebinding ${SUPPORT_ROLE}-binding \
+    --role=${SUPPORT_ROLE} \
+    --namespace=${NAMESPACE}
 else
   echo -e "\nConfiguring Worker Node...\n"
 
