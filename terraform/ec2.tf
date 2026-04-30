@@ -1,11 +1,14 @@
 ### Nodes
 
 resource "aws_instance" "control_plane" {
-  ami           = "${var.ami_id}"
-  instance_type = "${var.control_plane_type}"
-  key_name      = "${var.key_name}"
-  user_data     = templatefile("scripts/bootstrap.sh", {
-    placeholder = "placeholder"
+  ami             = "${var.ami_id}"
+  instance_type   = "${var.control_plane_type}"
+  key_name        = "${var.key_name}"
+  user_data       = templatefile("scripts/bootstrap.sh", {
+    CONTROL_PLANE = "true",
+    KUBE_VERSION  = var.kube_version,
+    BASE_PACKAGES = join(" ", var.base_packages),
+    KUBE_PACKAGES = join(" ", var.kube_packages)
   })
 
   vpc_security_group_ids = [aws_security_group.control_plane_sg.id]
@@ -16,15 +19,18 @@ resource "aws_instance" "control_plane" {
 }
 
 resource "aws_instance" "worker" {
-  ami           = "${var.ami_id}"
-  instance_type = "${var.worker_type}"
-  key_name      = "${var.key_name}"
-  count         = var.worker_count
-  user_data     = templatefile("scripts/bootstrap.sh", {
-    placeholder = "placeholder"
+  ami             = "${var.ami_id}"
+  instance_type   = "${var.worker_type}"
+  key_name        = "${var.key_name}"
+  count           = var.worker_count
+  user_data       = templatefile("scripts/bootstrap.sh", {
+    CONTROL_PLANE = "false",
+    KUBE_VERSION  = var.kube_version,
+    BASE_PACKAGES = join(" ", var.base_packages),
+    KUBE_PACKAGES = join(" ", var.kube_packages)
   })
 
-  associate_public_ip_address = false
+  #associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.worker_sg.id]
 
   tags = {

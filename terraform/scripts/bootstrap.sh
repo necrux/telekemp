@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-KUBE_VERSION="1.33.11-1.1"
-BASE_PACKAGES=(
-  "containerd"
-  "apt-transport-https"
-  "ca-certificates"
-  "curl"
-  "gpg"
-)
-KUBE_PACKAGES=(
-  "kubelet=${KUBE_VERSION}"
-  "kubeadm=${KUBE_VERSION}"
-  "kubectl=${KUBE_VERSION}"
-)
+# Configure logging.
+exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+echo "Starting user_data script..."
+
+KUBE_VERSION="${KUBE_VERSION}"
+BASE_PACKAGES="${BASE_PACKAGES}"
+KUBE_PACKAGES="${KUBE_PACKAGES}"
+
+KUBE_PACKAGES_VERSIONED=()
+
+for package in $${KUBE_PACKAGES}; do
+  KUBE_PACKAGES_VERSIONED+="$${package}=${KUBE_VERSION} "
+done
 
 # Package prep.
-apt update
-apt upgrade -y
-apt install -y "${BASE_PACKAGES[@]}"
+apt-get update
+apt-get upgrade -y
+apt-get install -y $${BASE_PACKAGES}
 
 mkdir -p -m 755 /etc/apt/keyrings
 curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key \
@@ -41,9 +41,18 @@ systemctl restart containerd
 # Kubernetes doesn’t support swap unless explicitly configured under cgroup v2.
 swapoff -a ||:
 
-# Install Kube.
+# Install pinned version of Kube.
 apt-get update
-apt install -y "${KUBE_PACKAGES[@]}"
+apt-get install -y $${KUBE_PACKAGES_VERSIONED[@]}
+apt-mark hold $${KUBE_PACKAGES_VERSIONED[@]}
 
-# Hold all Kube packages.
-apt-mark hold "${KUBE_PACKAGES[@]}"
+# enable IP packet forwarding on the node, allowing the kernel
+# to route network traffic between interfaces (pod-to-pod comms)
+sysctl -w net.ipv4.ip_forward=1
+echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.d/50-cloudimg-settings.conf
+sysctl -p /etc/sysctl.d/50-cloudimg-settings.conf
+
+# Configure the control-plane
+if [ "${CONTROL_PLANE}" == "true" ]; then
+  echo "Configuring the Control Plane..."
+fi

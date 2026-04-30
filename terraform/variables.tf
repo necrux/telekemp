@@ -17,9 +17,9 @@ variable "lockdown"            { default = true }
 
 variable "subnets" {
   default = [
-      "subnet-0262335772dbc8ad4",
-      "subnet-009c5ed853efa03bb",
-      "subnet-08d0062cfa3a8990e"
+    "subnet-0262335772dbc8ad4",
+    "subnet-009c5ed853efa03bb",
+    "subnet-08d0062cfa3a8990e"
   ]
 }
 
@@ -35,6 +35,26 @@ variable "control_plane_type" { default = "t3.micro" }
 variable "worker_name"  { default = "telekemp-worker" }
 variable "worker_type"  { default = "t3.micro" }
 variable "worker_count" { default = 2 }
+
+
+variable "kube_version"  { default = "1.33.11-1.1" }
+variable "pod_cidr"      { default = "192.168.0.0/16" }
+variable "base_packages" { 
+  default = [
+    "containerd",
+    "apt-transport-https",
+    "ca-certificates",
+    "curl",
+    "gpg"
+  ]
+}
+variable "kube_packages" {
+  default = [
+    "kubelet",
+    "kubeadm",
+    "kubectl"
+  ]
+}
 
 #--------------------------------------------------------------
 # Products
