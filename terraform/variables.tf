@@ -38,7 +38,7 @@ variable "worker_count" { default = 2 }
 
 
 variable "kube_version"   { default = "1.33.11-1.1" }
-variable "calico_version" { default = "3.31.0" }
+variable "calico_version" { default = "3.31.5" }
 variable "pod_cidr"       { default = "192.168.0.0/16" }
 
 variable "base_packages" { 

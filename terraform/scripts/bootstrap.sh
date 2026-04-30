@@ -2,7 +2,8 @@
 set -eo pipefail
 
 # Configure logging.
-exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+BOOTSTRAP_LOG='/var/log/telekemp-bootstrap.log'
+exec > >(tee $${BOOTSTRAP_LOG} | logger -t user-data -s 2>/dev/console) 2>&1
 echo -e "\nStarting user_data script...\n"
 
 # Set node status.
@@ -72,9 +73,9 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --cri-socket=unix:///run/containerd/containerd.sock
 
   # Store connection info in Secrets Manager
-  CP_ADDRESS=$(awk '/^kubeadm join/ {print $3}' /var/log/user-data.log)
-  CP_TOKEN=$(awk '/^kubeadm join/ {print $5}' /var/log/user-data.log)
-  CP_HASH=$(awk '/--discovery-token-ca-cert-hash/ {print $2}' /var/log/user-data.log)
+  CP_ADDRESS=$(awk '/^kubeadm join/ {print $3}' $${BOOTSTRAP_LOG})
+  CP_TOKEN=$(awk '/^kubeadm join/ {print $5}' $${BOOTSTRAP_LOG})
+  CP_HASH=$(awk '/--discovery-token-ca-cert-hash/ {print $2}' $${BOOTSTRAP_LOG})
 
   echo "{\"Address\": \"$${CP_ADDRESS}\",\"Token\": \"$${CP_TOKEN}\", \"Hash\": \"$${CP_HASH}\",\"Status\": \"Online\"}" > /kube_connection_info.json
 
@@ -89,11 +90,26 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --kubeconfig=/etc/kubernetes/admin.conf \
     -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
 
+  echo -e "\nWaiting for the Tigera operator...\n"
+  while true; do
+    if kubectl get deployments --kubeconfig=/etc/kubernetes/admin.conf -A | grep -q "^tigera.* 1/1"; then
+      kubectl apply \
+        --kubeconfig=/etc/kubernetes/admin.conf \
+        -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/custom-resources.yaml
+      break
+    else
+      sleep 25
+  fi
+  done
+
   # Upload connection info -- mark node Online
   aws secretsmanager put-secret-value \
     --secret-id control-plane-connection-info \
     --secret-string file:///kube_connection_info.json
 else
+  echo -e "\nConfiguring Worker Node...\n"
+
+  echo -e "\nWaiting for the Control Plane...\n"
   while true; do
     NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Status)
 
