@@ -30,15 +30,17 @@ variable "subnets" {
 variable "ami_id" { default = "ami-0fe18bc3cfa53a248" }
 
 variable "control_plane_name" { default = "telekemp-control-plane" }
-variable "control_plane_type" { default = "t3.micro" }
+variable "control_plane_type" { default = "m7i-flex.large" }
 
 variable "worker_name"  { default = "telekemp-worker" }
-variable "worker_type"  { default = "t3.micro" }
+variable "worker_type"  { default = "t3.small" }
 variable "worker_count" { default = 2 }
 
 
-variable "kube_version"  { default = "1.33.11-1.1" }
-variable "pod_cidr"      { default = "192.168.0.0/16" }
+variable "kube_version"   { default = "1.33.11-1.1" }
+variable "calico_version" { default = "3.31.0" }
+variable "pod_cidr"       { default = "192.168.0.0/16" }
+
 variable "base_packages" { 
   default = [
     "containerd",

@@ -3,9 +3,11 @@ set -eo pipefail
 
 # Configure logging.
 exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
-echo "Starting user_data script..."
+echo -e "\nStarting user_data script...\n"
 
 KUBE_VERSION="${KUBE_VERSION}"
+CALICO_VERSION="${CALICO_VERSION}"
+POD_CIDR="${POD_CIDR}"
 BASE_PACKAGES="${BASE_PACKAGES}"
 KUBE_PACKAGES="${KUBE_PACKAGES}"
 
@@ -54,5 +56,20 @@ sysctl -p /etc/sysctl.d/50-cloudimg-settings.conf
 
 # Configure the control-plane
 if [ "${CONTROL_PLANE}" == "true" ]; then
-  echo "Configuring the Control Plane..."
+  echo -e "\nConfiguring the Control Plane...\n"
+
+  kubeadm init \
+    --ignore-preflight-errors=Mem \
+    --pod-network-cidr=$${POD_CIDR} \
+    --cri-socket=unix:///run/containerd/containerd.sock
+
+  export KUBECONFIG=/etc/kubernetes/admin.conf
+  KUBE_USER="ubuntu"
+  mkdir -p /home/$${KUBE_USER}/.kube
+  cp -i /etc/kubernetes/admin.conf /home/$${KUBE_USER}/.kube/config
+  chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
+
+  # Install calcio
+  kubectl apply -f \
+    https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
 fi
