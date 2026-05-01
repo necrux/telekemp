@@ -2,7 +2,7 @@
 set -eo pipefail
 
 BOOTSTRAP_LOG='/var/log/telekemp-bootstrap.log'
-SECRET_STORE="control-plane-secrets"
+CP_SECRETS="${CP_SECRETS}"
 KUBE_USER="ubuntu"
 KUBE_ADMIN_FILE="/etc/kubernetes/admin.conf"
 NODE_STATUS="Offline"
@@ -24,7 +24,7 @@ apt-get install -y awscli
 
 if [ "${CONTROL_PLANE}" == "true" ]; then
   aws secretsmanager put-secret-value \
-    --secret-id $${SECRET_STORE} \
+    --secret-id $${CP_SECRETS} \
     --secret-string '{"Status": "Offline"}'
 fi
 
@@ -135,7 +135,7 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
 
   # Upload connection info -- mark node Online
   aws secretsmanager put-secret-value \
-    --secret-id $${SECRET_STORE} \
+    --secret-id $${CP_SECRETS} \
     --secret-string file:///kube_connection_info.json
 
   # Configure Kube Namespace(s)
@@ -169,15 +169,15 @@ else
     if [ "$${NODE_STATUS}" != "Online" ]; then
       sleep 5
     else
-      CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Address)
-      CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Token)
-      CP_HASH=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Hash)
+      CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Address)
+      CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Token)
+      CP_HASH=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Hash)
 
       kubeadm join $${CP_ADDRESS} \
         --token $${CP_TOKEN} \
         --discovery-token-ca-cert-hash $${CP_HASH}
     fi
 
-    NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Status)
+    NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Status)
   done
 fi

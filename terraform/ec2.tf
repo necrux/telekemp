@@ -5,6 +5,7 @@ resource "aws_instance" "control_plane" {
   key_name         = "${var.key_name}"
   user_data        = templatefile("scripts/bootstrap.sh", {
     CONTROL_PLANE  = "true",
+    CP_SECRETS     = var.control_plane_secrets,
     KUBE_VERSION   = var.kube_version,
     CALICO_VERSION = var.calico_version,
     POD_CIDR       = var.pod_cidr,
@@ -34,6 +35,7 @@ resource "aws_instance" "worker" {
   count            = var.worker_count
   user_data        = templatefile("scripts/bootstrap.sh", {
     CONTROL_PLANE  = "false",
+    CP_SECRETS     = var.control_plane_secrets,
     KUBE_VERSION   = var.kube_version,
     CALICO_VERSION = var.calico_version,
     POD_CIDR       = var.pod_cidr,

@@ -29,8 +29,9 @@ variable "subnets" {
 
 variable "ami_id" { default = "ami-0fe18bc3cfa53a248" }
 
-variable "control_plane_name" { default = "telekemp-control-plane" }
-variable "control_plane_type" { default = "m7i-flex.large" }
+variable "control_plane_name"    { default = "telekemp-control-plane" }
+variable "control_plane_type"    { default = "m7i-flex.large" }
+variable "control_plane_secrets" { default = "control-plane-secrets" }
 
 variable "worker_name"  { default = "telekemp-worker" }
 variable "worker_type"  { default = "t3.small" }
