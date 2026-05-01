@@ -14,11 +14,11 @@ KUBE_PACKAGES="${KUBE_PACKAGES}"
 
 KUBE_PACKAGES_VERSIONED=()
 
-# Configure logging.
+# Configure: Logging
 exec > >(tee $${BOOTSTRAP_LOG} | logger -t user-data -s 2>/dev/console) 2>&1
 echo -e "\nStarting user_data script...\n"
 
-# Set node status.
+# Set: Control Plane Status
 apt-get update
 apt-get install -y awscli
 
@@ -60,7 +60,7 @@ for package in $${KUBE_PACKAGES}; do
   KUBE_PACKAGES_VERSIONED+="$${package}=${KUBE_VERSION} "
 done
 
-# Package prep.
+# Install: Base Packages
 apt-get upgrade -y
 apt-get install -y $${BASE_PACKAGES}
 
@@ -70,9 +70,9 @@ curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.36/deb/Release.key \
 echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.33/deb/ /' \
   | tee /etc/apt/sources.list.d/kubernetes.list
 
-# Generate the default containerd configuration
-# Change the pause container to version 3.10 (pause container holds the Linux NS for Kubernetes namespaces)
-# Set `SystemdCgroup` to true to use same cgroup drive as kubelet
+# Configure: containerd
+## Change the pause container to version 3.10 (holds the Linux NS for k8s namespaces)
+## Set `SystemdCgroup` to true to use same cgroup drive as kubelet
 mkdir -p /etc/containerd
 
 containerd config default \
@@ -82,21 +82,30 @@ containerd config default \
 
 systemctl restart containerd
 
-# Kubernetes doesn’t support swap unless explicitly configured under cgroup v2.
 swapoff -a ||:
 
-# Install pinned version of Kube.
+# Install: Kube (pinned version)
 apt-get update
 apt-get install -y $${KUBE_PACKAGES_VERSIONED[@]}
 apt-mark hold $${KUBE_PACKAGES_VERSIONED[@]}
 
-# enable IP packet forwarding on the node, allowing the kernel
-# to route network traffic between interfaces (pod-to-pod comms)
+# Install: Helm
+curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey \
+  | gpg --dearmor \
+  | tee /usr/share/keyrings/helm.gpg \
+  > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" \
+  | tee /etc/apt/sources.list.d/helm-stable-debian.list
+apt-get update
+apt-get install -y helm
+
+## enable IP packet forwarding on the node, allowing the kernel
+## to route network traffic between interfaces (pod-to-pod comms)
 sysctl -w net.ipv4.ip_forward=1
 echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.d/50-cloudimg-settings.conf
 sysctl -p /etc/sysctl.d/50-cloudimg-settings.conf
 
-# Configure the control-plane
+# Configure: control-plane
 if [ "${CONTROL_PLANE}" == "true" ]; then
   echo -e "\nConfiguring the Control Plane...\n"
 
@@ -104,19 +113,19 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --pod-network-cidr=$${POD_CIDR} \
     --cri-socket=unix:///run/containerd/containerd.sock
 
-  # Store connection info in Secrets Manager
+  # Set: Secrets
   CP_ADDRESS=$(awk '/^kubeadm join/ {print $3}' $${BOOTSTRAP_LOG})
   CP_TOKEN=$(awk '/^kubeadm join/ {print $5}' $${BOOTSTRAP_LOG})
   CP_HASH=$(awk '/--discovery-token-ca-cert-hash/ {print $2}' $${BOOTSTRAP_LOG})
 
   echo "{\"Address\": \"$${CP_ADDRESS}\",\"Token\": \"$${CP_TOKEN}\", \"Hash\": \"$${CP_HASH}\",\"Status\": \"Online\"}" > /kube_connection_info.json
 
-  # Configure Kube Cluster
+  # Configure: Kube Cluster
   mkdir -p /home/$${KUBE_USER}/.kube
   cp -i $${KUBE_ADMIN_FILE} /home/$${KUBE_USER}/.kube/config
   chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
 
-  # Install Calcio
+  # Install: Calcio
   kubectl apply \
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
@@ -133,12 +142,12 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
   fi
   done
 
-  # Upload connection info -- mark node Online
+  # Configure: Secrets Manager
   aws secretsmanager put-secret-value \
     --secret-id $${CP_SECRETS} \
     --secret-string file:///kube_connection_info.json
 
-  # Configure Kube Namespace(s)
+  # Configure: Kube Namespace(s)
   kubectl \
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     create \
@@ -169,6 +178,7 @@ else
     if [ "$${NODE_STATUS}" != "Online" ]; then
       sleep 5
     else
+      # Join the cluster.
       CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Address)
       CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Token)
       CP_HASH=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Hash)
