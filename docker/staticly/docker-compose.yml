@@ -1,0 +1,10 @@
+services:
+  staticly:
+    build: .
+    image: staticly
+    ports:
+      - "8080:80"
+
+    # Interactive Shell for Troubleshooting
+    #stdin_open: true # docker run -i
+    #tty: true        # docker run -t

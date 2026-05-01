@@ -220,5 +220,10 @@ __marimo__/
 # Environment
 .aws
 *.swp
+
+# Terraform
 *terraform.tfstate
 terraform/.terraform
+
+# Helm
+helm/charts/

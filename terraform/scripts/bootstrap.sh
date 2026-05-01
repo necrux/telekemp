@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-# Configure logging.
 BOOTSTRAP_LOG='/var/log/telekemp-bootstrap.log'
+SECRET_STORE="control-plane-secrets"
+KUBE_USER="ubuntu"
+KUBE_ADMIN_FILE="/etc/kubernetes/admin.conf"
+NODE_STATUS="Offline"
+KUBE_VERSION="${KUBE_VERSION}"
+CALICO_VERSION="${CALICO_VERSION}"
+POD_CIDR="${POD_CIDR}"
+BASE_PACKAGES="${BASE_PACKAGES}"
+KUBE_PACKAGES="${KUBE_PACKAGES}"
+
+KUBE_PACKAGES_VERSIONED=()
+
+# Configure logging.
 exec > >(tee $${BOOTSTRAP_LOG} | logger -t user-data -s 2>/dev/console) 2>&1
 echo -e "\nStarting user_data script...\n"
 
@@ -12,7 +24,7 @@ apt-get install -y awscli
 
 if [ "${CONTROL_PLANE}" == "true" ]; then
   aws secretsmanager put-secret-value \
-    --secret-id control-plane-connection-info \
+    --secret-id $${SECRET_STORE} \
     --secret-string '{"Status": "Offline"}'
 fi
 
@@ -43,14 +55,6 @@ rules:
   verbs: ["get", "watch", "list"]
 EOF
 }
-
-KUBE_VERSION="${KUBE_VERSION}"
-CALICO_VERSION="${CALICO_VERSION}"
-POD_CIDR="${POD_CIDR}"
-BASE_PACKAGES="${BASE_PACKAGES}"
-KUBE_PACKAGES="${KUBE_PACKAGES}"
-
-KUBE_PACKAGES_VERSIONED=()
 
 for package in $${KUBE_PACKAGES}; do
   KUBE_PACKAGES_VERSIONED+="$${package}=${KUBE_VERSION} "
@@ -108,21 +112,20 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
   echo "{\"Address\": \"$${CP_ADDRESS}\",\"Token\": \"$${CP_TOKEN}\", \"Hash\": \"$${CP_HASH}\",\"Status\": \"Online\"}" > /kube_connection_info.json
 
   # Configure Kube Cluster
-  KUBE_USER="ubuntu"
   mkdir -p /home/$${KUBE_USER}/.kube
-  cp -i /etc/kubernetes/admin.conf /home/$${KUBE_USER}/.kube/config
+  cp -i $${KUBE_ADMIN_FILE} /home/$${KUBE_USER}/.kube/config
   chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
 
   # Install Calcio
   kubectl apply \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
 
   echo -e "\nWaiting for the Tigera operator...\n"
   while true; do
-    if kubectl get deployments --kubeconfig=/etc/kubernetes/admin.conf -A | grep -q "^tigera.* 1/1"; then
+    if kubectl get deployments --kubeconfig=$${KUBE_ADMIN_FILE} -A | grep -q "^tigera.* 1/1"; then
       kubectl apply \
-        --kubeconfig=/etc/kubernetes/admin.conf \
+        --kubeconfig=$${KUBE_ADMIN_FILE} \
         -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/custom-resources.yaml
       break
     else
@@ -132,29 +135,29 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
 
   # Upload connection info -- mark node Online
   aws secretsmanager put-secret-value \
-    --secret-id control-plane-connection-info \
+    --secret-id $${SECRET_STORE} \
     --secret-string file:///kube_connection_info.json
 
   # Configure Kube Namespace(s)
   kubectl \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     create \
     namespace ${NAMESPACE}
 
   kubectl \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     apply -f <(dev-role)
   kubectl \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     apply -f <(support-role)
 
   kubectl \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     create rolebinding ${DEV_ROLE}-binding \
     --role=${DEV_ROLE} \
     --namespace=${NAMESPACE}
   kubectl \
-    --kubeconfig=/etc/kubernetes/admin.conf \
+    --kubeconfig=$${KUBE_ADMIN_FILE} \
     create rolebinding ${SUPPORT_ROLE}-binding \
     --role=${SUPPORT_ROLE} \
     --namespace=${NAMESPACE}
@@ -163,18 +166,18 @@ else
 
   echo -e "\nWaiting for the Control Plane...\n"
   while true; do
-    NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Status)
-
     if [ "$${NODE_STATUS}" != "Online" ]; then
       sleep 5
     else
-      CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Address)
-      CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Token)
-      CP_HASH=$(aws secretsmanager get-secret-value --secret-id control-plane-connection-info --query SecretString --output text | jq -r .Hash)
+      CP_ADDRESS=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Address)
+      CP_TOKEN=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Token)
+      CP_HASH=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Hash)
 
       kubeadm join $${CP_ADDRESS} \
         --token $${CP_TOKEN} \
         --discovery-token-ca-cert-hash $${CP_HASH}
     fi
+
+    NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id $${SECRET_STORE} --query SecretString --output text | jq -r .Status)
   done
 fi

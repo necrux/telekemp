@@ -1,0 +1,9 @@
+FROM nginx:alpine
+LABEL version="v1.0.0"
+LABEL description="A super cool static website."
+
+RUN rm -rf /usr/share/nginx/html/*
+COPY ./html /usr/share/nginx/html
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
