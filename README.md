@@ -13,6 +13,23 @@ kubectl get nodes
 kubectl get pods -A
 ```
 
+> [!WARNING]
+> This is not an EKS solution, meaning that it does not cleanly integrate with other AWS services out of the box: subnets, ALBs, etc. I have opted not to build a new VPC and related infrasture as part of this project meaning that you must **manually** tag the subnets in your desired VPC so that Istio can create the ALBs. 
+
+**Public Subnets**
+
+```
+kubernetes.io/cluster/telekemp: [ owned | shared ]
+kubernetes.io/role/elb: 1
+```
+
+**Private Subets**
+
+```
+kubernetes.io/cluster/telekemp: [ owned | shared ]
+kubernetes.io/role/internal-elb: 1
+```
+
 ### Kubernetes
 
 Kubernetes is bootstraped via Terraform using `user_data`; this includes basic cluster configuration. All associated scripts can be found [here](https://github.com/necrux/telekemp/tree/main/terraform/scripts).
@@ -107,8 +124,11 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Configure DNS.
 * Set up cert-manager.
 * Complete Teleport deployment.
-* Expose a Flux deployment option.
 * Templatize the Istio charts.
+* Modularize the Terraform build.
 * Deploy a second app with a database backend in order to test Teleport integration.
 
 ## Sources
+
+* [Istio: Version Compatibility](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases)
+* [Configure Flux](https://fluxcd.io/flux/installation/#configure-the-flux-instance)

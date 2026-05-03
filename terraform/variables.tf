@@ -15,13 +15,13 @@ variable "key_name" { default = "telekemp-admin" }
 variable "base_security_group" { default = "" }
 variable "lockdown"            { default = true } 
 
-variable "subnets" {
-  default = [
-    "subnet-0262335772dbc8ad4",
-    "subnet-009c5ed853efa03bb",
-    "subnet-08d0062cfa3a8990e"
-  ]
-}
+#variable "subnets" {
+#  default = [
+#    "subnet-0262335772dbc8ad4",
+#    "subnet-009c5ed853efa03bb",
+#    "subnet-08d0062cfa3a8990e"
+#  ]
+#}
 
 #--------------------------------------------------------------
 # k8s - Build
@@ -80,6 +80,12 @@ variable "rw_role"   { default = "telekemp-devs" }
 variable "deploy_istio"         { default = true }
 variable "istio_version"        { default = "1.29.2" }
 variable "deploy_lb_controller" { default = true }
-variable "deploy_argocd"        { default = true } # User: admin -- Password: /root/argocd_initial_password.txt
+variable "deploy_argocd"        { default = true }
+variable "deploy_flux"          { default = false }
 variable "deploy_teleport"      { default = true }
 variable "teleport_version"     { default = "18.7.6" }
+
+## Login Details
+### ArgoCD
+#### User: admin
+#### Password: *On control-plane in /root/argocd_initial_password.txt*

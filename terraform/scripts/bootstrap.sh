@@ -19,6 +19,7 @@ TELEPORT="${TELEPORT}"
 TELEPORT_VERSION="${TELEPORT_VERSION}"
 LB_CONTROLLER="${LB_CONTROLLER}"
 ARGOCD="${ARGOCD}"
+FLUX="${FLUX}"
 
 KUBE_PACKAGES_VERSIONED=()
 
@@ -245,6 +246,15 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
       > /root/argocd_initial_password.txt
   fi
 
+  # Install: Flux
+  if [ "$${FLUX}" == "true" ]; then
+    helm install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
+      --namespace flux-system \
+      --create-namespace
+  fi
+
+  echo -e "\nThe control-plane has been bootstrapped successfully."
+
 else
   echo -e "\nConfiguring Worker Node...\n"
 
@@ -266,4 +276,6 @@ else
 
     NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Status)
   done
+
+  echo -e "\nThe worker has been bootstrapped successfully."
 fi

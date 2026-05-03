@@ -21,7 +21,8 @@ resource "aws_instance" "control_plane" {
     TELEPORT         = tostring(var.deploy_teleport),
     TELEPORT_VERSION = var.teleport_version,
     LB_CONTROLLER    = tostring(var.deploy_lb_controller),
-    ARGOCD           = tostring(var.deploy_argocd)
+    ARGOCD           = tostring(var.deploy_argocd),
+    FLUX             = tostring(var.deploy_flux)
   })
 
   vpc_security_group_ids = [aws_security_group.control_plane_sg.id]
@@ -70,7 +71,8 @@ resource "aws_instance" "worker" {
     TELEPORT         = tostring(var.deploy_teleport),
     TELEPORT_VERSION = var.teleport_version,
     LB_CONTROLLER    = tostring(var.deploy_lb_controller),
-    ARGOCD           = tostring(var.deploy_argocd)
+    ARGOCD           = tostring(var.deploy_argocd),
+    FLUX             = tostring(var.deploy_flux)
   })
 
   #associate_public_ip_address = false
