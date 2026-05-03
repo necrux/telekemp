@@ -1,6 +1,6 @@
 # telekemp
 
-Testing k8s cluster w/ Teleport.
+A full deployment of Kubernetes with `kubeadm` on EC2 instances. Telekemp is an exploration of the following technologies and how they interact: Teleport + Kubernetes + Nginx + MariaDB + Python (PHP?)
 
 ## Infrastucture
 
@@ -31,7 +31,6 @@ Container build instructions for each application can be found in the [docker](h
 ```
 docker tag my-image USERNAME/my-repo:v1.0.0
 docker push USERNAME/my-repo:v1.0.0
-
 ```
 
 > [!TIP]
@@ -64,6 +63,7 @@ kubectl create rolebinding ${BINDING} --role=${ROLE} --user=${USER}
 
 ```
 function my-new-role {
+cat << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -74,6 +74,7 @@ rules:
   resources: ["pods"]
   verbs: ["VERBS"]
 }
+EOF
 ```
 
 And apply the new role as follows:
@@ -95,14 +96,14 @@ Deploying the Helm chart can be done any number of ways but the simpliest option
 
 ## Access
 
-Internal applications such as Whisker and ArgoCD have not been exposed over the Internet for security reasons. You can access them by using the [access-tools](https://github.com/necrux/telekemp/tree/main/access-tools) to create an SSH tunnel.
+Internal applications such as Whisker and ArgoCD have not been exposed over the Internet for security purposes. You can access them by using the [access-tools](https://github.com/necrux/telekemp/tree/main/access-tools) to create an SSH tunnel.
 
 > [!NOTE]
 > If you opted to deploy ArgoCD the default user is `admin` and the temporary login credentials can be found in `/root/argocd_initial_password.txt` on the control-plane.
 
 ## Roadmap
 
-* Fix ALB deployments for istio (disallowed for new accounts; AWS ticket pending).
+* Fix ALB deployments for istio (disallowed for new AWS accounts; AWS ticket pending).
 * Configure DNS.
 * Set up cert-manager.
 * Complete Teleport deployment.
