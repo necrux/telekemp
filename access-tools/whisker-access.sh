@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [ -z $@ ]; then
+  echo "Usage: $0 </path/to/key> <address>"
+  exit 1
+fi
+
 KEY=$1
 ADDRESS=$2
 
