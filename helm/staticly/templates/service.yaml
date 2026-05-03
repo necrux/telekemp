@@ -4,6 +4,8 @@ metadata:
   name: {{ include "staticly.fullname" . }}
   labels:
     {{- include "staticly.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
   type: {{ .Values.service.type }}
   ports:
