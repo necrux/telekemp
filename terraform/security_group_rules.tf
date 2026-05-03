@@ -27,6 +27,18 @@ resource "aws_vpc_security_group_ingress_rule" "control_plane_kubelet" {
   referenced_security_group_id = aws_security_group.control_plane_sg.id
 }
 
+# Control Plane - Allow all traffic from self
+resource "aws_vpc_security_group_ingress_rule" "control_plane_allow_self" {
+  security_group_id = aws_security_group.control_plane_sg.id
+  ip_protocol       = "-1"
+
+  referenced_security_group_id = aws_security_group.control_plane_sg.id
+
+  depends_on = [
+    aws_security_group.control_plane_sg
+  ]
+}
+
 # Control Plane - Allow all traffic from Worker Security Group
 resource "aws_vpc_security_group_ingress_rule" "from_worker" {
   security_group_id = aws_security_group.control_plane_sg.id
@@ -55,6 +67,18 @@ resource "aws_vpc_security_group_ingress_rule" "worker_node_port" {
   security_group_id = aws_security_group.worker_sg.id
   cidr_ipv4   = "0.0.0.0/0"
   ip_protocol = "-1"
+}
+
+# Worker - Allow all traffic from self
+resource "aws_vpc_security_group_ingress_rule" "worker_allow_self" {
+  security_group_id = aws_security_group.worker_sg.id
+  ip_protocol       = "-1"
+
+  referenced_security_group_id = aws_security_group.worker_sg.id
+
+  depends_on = [
+    aws_security_group.worker_sg
+  ]
 }
 
 # Worker - Allow all traffic from Control Plane Security Group
