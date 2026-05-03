@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-BOOTSTRAP_LOG='/var/log/telekemp-bootstrap.log'
+BOOTSTRAP_LOG='/var/log/bootstrap.log'
 CP_SECRETS="${CP_SECRETS}"
+REGION="${REGION}"
+VPC_ID="${VPC_ID}"
 KUBE_USER="ubuntu"
 KUBE_ADMIN_FILE="/etc/kubernetes/admin.conf"
 NODE_STATUS="Offline"
@@ -11,6 +13,12 @@ CALICO_VERSION="${CALICO_VERSION}"
 POD_CIDR="${POD_CIDR}"
 BASE_PACKAGES="${BASE_PACKAGES}"
 KUBE_PACKAGES="${KUBE_PACKAGES}"
+GATEWAY="${GATEWAY}"
+ISTIO_VERSION="${ISTIO_VERSION}"
+TELEPORT="${TELEPORT}"
+TELEPORT_VERSION="${TELEPORT_VERSION}"
+LB_CONTROLLER="${LB_CONTROLLER}"
+ARGOCD="${ARGOCD}"
 
 KUBE_PACKAGES_VERSIONED=()
 
@@ -89,16 +97,6 @@ apt-get update
 apt-get install -y $${KUBE_PACKAGES_VERSIONED[@]}
 apt-mark hold $${KUBE_PACKAGES_VERSIONED[@]}
 
-# Install: Helm
-curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey \
-  | gpg --dearmor \
-  | tee /usr/share/keyrings/helm.gpg \
-  > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" \
-  | tee /etc/apt/sources.list.d/helm-stable-debian.list
-apt-get update
-apt-get install -y helm
-
 ## enable IP packet forwarding on the node, allowing the kernel
 ## to route network traffic between interfaces (pod-to-pod comms)
 sysctl -w net.ipv4.ip_forward=1
@@ -109,6 +107,17 @@ sysctl -p /etc/sysctl.d/50-cloudimg-settings.conf
 if [ "${CONTROL_PLANE}" == "true" ]; then
   echo -e "\nConfiguring the Control Plane...\n"
 
+  # Install: Helm
+  curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey \
+    | gpg --dearmor \
+    | tee /usr/share/keyrings/helm.gpg \
+    > /dev/null
+  echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" \
+    | tee /etc/apt/sources.list.d/helm-stable-debian.list
+  apt-get update
+  apt-get install -y helm
+
+  # Set: Kube Init
   kubeadm init \
     --pod-network-cidr=$${POD_CIDR} \
     --cri-socket=unix:///run/containerd/containerd.sock
@@ -125,7 +134,7 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
   cp -i $${KUBE_ADMIN_FILE} /home/$${KUBE_USER}/.kube/config
   chown -R $${KUBE_USER}:$${KUBE_USER} /home/$${KUBE_USER}/.kube
 
-  # Install: Calcio
+  # Install: Calico
   kubectl apply \
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/tigera-operator.yaml
@@ -135,7 +144,7 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     if kubectl get deployments --kubeconfig=$${KUBE_ADMIN_FILE} -A | grep -q "^tigera.* 1/1"; then
       kubectl apply \
         --kubeconfig=$${KUBE_ADMIN_FILE} \
-        -f https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/custom-resources.yaml
+        -f <(curl -s https://raw.githubusercontent.com/projectcalico/calico/v$${CALICO_VERSION}/manifests/custom-resources.yaml | sed 's@cidr:.*@cidr: ${POD_CIDR}@g' | sed 's@encapsulation: VXLANCrossSubnet@encapsulation: VXLAN@g')
       break
     else
       sleep 25
@@ -147,7 +156,7 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --secret-id $${CP_SECRETS} \
     --secret-string file:///kube_connection_info.json
 
-  # Configure: Kube Namespace(s)
+  # Configure: Kube Namespace & Role(s)
   kubectl \
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     create \
@@ -170,6 +179,72 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     create rolebinding ${SUPPORT_ROLE}-binding \
     --role=${SUPPORT_ROLE} \
     --namespace=${NAMESPACE}
+
+  # Install: istio
+  if [ "$${GATEWAY}" == "true" ]; then
+    export KUBECONFIG=$${KUBE_ADMIN_FILE}
+    helm repo add istio https://istio-release.storage.googleapis.com/charts
+    helm repo update
+
+    helm install istio-base istio/base \
+      --namespace istio-system \
+      --version $${ISTIO_VERSION} \
+      --create-namespace
+    helm install istiod istio/istiod \
+      --namespace istio-system \
+      --version $${ISTIO_VERSION}
+      #--set global.remotePilotAddress=istiod.istio-system.svc.cluster.local
+      #--set pilot.resources.requests.memory=128Mi \
+      #--set pilot.resources.requests.cpu=250m
+    helm install istio-ingress istio/gateway \
+      --namespace istio-ingress \
+      --version $${ISTIO_VERSION} \
+      --create-namespace
+    kubectl label namespace ${NAMESPACE} istio-injection=enabled
+  fi
+
+  # Install: AWS Load Balancer Controller
+  if [ "$${LB_CONTROLLER}" == "true" ]; then
+    export KUBECONFIG=$${KUBE_ADMIN_FILE}
+    helm repo add eks https://aws.github.io/eks-charts
+    helm repo update
+
+    helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    --namespace kube-system \
+    --set region=${REGION} \
+    --set vpcID=${VPC_ID} \
+    --set clusterName=${NAMESPACE} \
+    --set serviceAccount.create=true
+  fi
+
+  # Install: Teleport
+  if [ "$${TELEPORT}" == "true" ]; then
+    helm repo add teleport https://charts.releases.teleport.dev
+    helm repo update
+
+    helm install teleport-cluster teleport/teleport-cluster \
+        --namespace teleport-cluster \
+        --set clusterName=teleport-cluster.teleport-cluster.svc.cluster.local \
+        --set operator.enabled=true \
+        --version $${TELEPORT_VERSION} \
+        --create-namespace
+  fi
+
+  # Install: ArgoCD
+  if [ "$${ARGOCD}" == "true" ]; then
+    helm repo add argo https://argoproj.github.io/argo-helm
+    helm repo update
+    helm install argocd argo/argo-cd \
+      --namespace argocd \
+      --create-namespace
+    # Save initial password.
+    kubectl -n argocd \
+      get secret argocd-initial-admin-secret \
+      -o jsonpath="{.data.password}" \
+      | base64 -d \
+      > /root/argocd_initial_password.txt
+  fi
+
 else
   echo -e "\nConfiguring Worker Node...\n"
 
@@ -186,6 +261,7 @@ else
       kubeadm join $${CP_ADDRESS} \
         --token $${CP_TOKEN} \
         --discovery-token-ca-cert-hash $${CP_HASH}
+      break
     fi
 
     NODE_STATUS=$(aws secretsmanager get-secret-value --secret-id $${CP_SECRETS} --query SecretString --output text | jq -r .Status)
