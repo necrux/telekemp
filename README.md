@@ -14,7 +14,7 @@ kubectl get pods -A
 ```
 
 > [!WARNING]
-> This is not an EKS solution, meaning that it does not cleanly integrate with other AWS services out of the box: subnets, ALBs, etc. I have opted not to build a new VPC and related infrasture as part of this project meaning that you must **manually** tag the subnets in your desired VPC so that Istio can create the ALBs. 
+> This is not an EKS solution, meaning that it does not cleanly integrate with other AWS services out of the box: subnets, ALBs, etc. I have opted **not** to build a new VPC and related infrasture as part of this project meaning that you must **manually** tag the subnets in your desired VPC so that Istio can create the ALBs.
 
 **Public Subnets**
 
@@ -46,8 +46,8 @@ Container build instructions for each application can be found in the [docker](h
 * [Staticly](https://hub.docker.com/repository/docker/necrux/staticly)
 
 ```
-docker tag my-image USERNAME/my-repo:v1.0.0
-docker push USERNAME/my-repo:v1.0.0
+docker tag staticly necrux/staticly:vX.X.X
+docker push necrux/staticly:vX.X.X
 ```
 
 > [!TIP]
