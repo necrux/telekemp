@@ -4,12 +4,15 @@ set -eo pipefail
 BOOTSTRAP_LOG='/var/log/bootstrap.log'
 CP_SECRETS="${CP_SECRETS}"
 REGION="${REGION}"
+ACCOUNT_ID="${ACCOUNT_ID}"
 VPC_ID="${VPC_ID}"
 KUBE_USER="ubuntu"
 KUBE_ADMIN_FILE="/etc/kubernetes/admin.conf"
 NODE_STATUS="Offline"
 KUBE_VERSION="${KUBE_VERSION}"
 CALICO_VERSION="${CALICO_VERSION}"
+CERT_MANAGER="${CERT_MANAGER}"
+CERT_MANAGER_VER="${CERT_MANAGER_VER}"
 POD_CIDR="${POD_CIDR}"
 BASE_PACKAGES="${BASE_PACKAGES}"
 KUBE_PACKAGES="${KUBE_PACKAGES}"
@@ -170,20 +173,33 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     apply -f <(support-role)
 
-  kubectl \
-    --kubeconfig=$${KUBE_ADMIN_FILE} \
-    create rolebinding ${DEV_ROLE}-binding \
-    --role=${DEV_ROLE} \
-    --namespace=${NAMESPACE}
-  kubectl \
-    --kubeconfig=$${KUBE_ADMIN_FILE} \
-    create rolebinding ${SUPPORT_ROLE}-binding \
-    --role=${SUPPORT_ROLE} \
-    --namespace=${NAMESPACE}
+  #kubectl \
+  #  --kubeconfig=$${KUBE_ADMIN_FILE} \
+  #  create rolebinding ${DEV_ROLE}-binding \
+  #  --role=${DEV_ROLE} \
+  #  --namespace=${NAMESPACE}
+  #kubectl \
+  #  --kubeconfig=$${KUBE_ADMIN_FILE} \
+  #  create rolebinding ${SUPPORT_ROLE}-binding \
+  #  --role=${SUPPORT_ROLE} \
+  #  --namespace=${NAMESPACE}
+
+  export KUBECONFIG=$${KUBE_ADMIN_FILE}
+
+  # Install: cert-manager
+  if [ "$${CERT_MANAGER}" == "true" ]; then
+    echo -e '\nInstalling cert-manager...\n'
+    helm install \
+    cert-manager oci://quay.io/jetstack/charts/cert-manager \
+      --namespace cert-manager \
+      --version v$${CERT_MANAGER_VER} \
+      --set crds.enabled=true \
+      --create-namespace
+  fi
 
   # Install: istio
   if [ "$${GATEWAY}" == "true" ]; then
-    export KUBECONFIG=$${KUBE_ADMIN_FILE}
+    echo -e '\nInstalling Istio...\n'
     helm repo add istio https://istio-release.storage.googleapis.com/charts
     helm repo update
 
@@ -206,7 +222,7 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
 
   # Install: AWS Load Balancer Controller
   if [ "$${LB_CONTROLLER}" == "true" ]; then
-    export KUBECONFIG=$${KUBE_ADMIN_FILE}
+    echo -e '\nInstalling AWS Load Balancer Controller...\n'
     helm repo add eks https://aws.github.io/eks-charts
     helm repo update
 
@@ -215,11 +231,17 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --set region=${REGION} \
     --set vpcID=${VPC_ID} \
     --set clusterName=${NAMESPACE} \
+    --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::$${ACCOUNT_ID}:role/AmazonEKSLoadBalancerControllerRole \
     --set serviceAccount.create=true
+
+    #kubectl annotate serviceaccount aws-load-balancer-controller \
+    #  -n kube-system \
+    #  eks.amazonaws.com/role-arn=arn:aws:iam::$${ACCOUNT_ID}:role/AWSLoadBalancerControllerRole
   fi
 
   # Install: Teleport
   if [ "$${TELEPORT}" == "true" ]; then
+    echo -e '\nInstalling Teleport...\n'
     helm repo add teleport https://charts.releases.teleport.dev
     helm repo update
 
@@ -233,21 +255,17 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
 
   # Install: ArgoCD
   if [ "$${ARGOCD}" == "true" ]; then
+    echo -e '\nInstalling ArgoCD...\n'
     helm repo add argo https://argoproj.github.io/argo-helm
     helm repo update
     helm install argocd argo/argo-cd \
       --namespace argocd \
       --create-namespace
-    # Save initial password.
-    kubectl -n argocd \
-      get secret argocd-initial-admin-secret \
-      -o jsonpath="{.data.password}" \
-      | base64 -d \
-      > /root/argocd_initial_password.txt
   fi
 
   # Install: Flux
   if [ "$${FLUX}" == "true" ]; then
+    echo -e '\nInstalling Flux...\n'
     helm install flux-operator oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator \
       --namespace flux-system \
       --create-namespace

@@ -2,11 +2,52 @@
 
 A full deployment of Kubernetes with `kubeadm` on EC2 instances. Telekemp is an exploration of the following technologies and how they interact: Teleport + Kubernetes + Nginx + MariaDB + Python (PHP?)
 
+
+## Overview
+
+```mermaid
+flowchart LR
+    Dev[Developer] -->|Commit Code| GH[GitHub]
+    Dev[Developer] -->|Run Terraform| TF[Terraform]
+
+    %% CI Pipeline
+    GH -->|Trigger CI| CI[GitHub Actions]
+    CI -->|Build Image| Docker[Docker Build]
+    Docker -->|Push Image| DH[Docker Hub]
+
+    CI -->|Update Helm Values| GH
+
+    %% GitOps
+    GH -->|Sync| Argo[ArgoCD]
+
+    %% Terraform acts from outside AWS
+    TF -->|Provision Infra| AWSInfra
+    TF -->|Bootstrap Kube| Kubeadm
+
+    subgraph Outer ["AWS"]
+      
+      %% Infra Pipeline
+      subgraph Inner ["Build"]
+        AWSInfra[AWS Infrastructure]
+        Kubeadm[kubeadm Init]
+      end
+
+      AWSInfra --> K8s[Kubernetes Cluster]
+      Kubeadm --> K8s
+
+      Argo -->|Apply Manifests| K8s
+      K8s --> ALB[AWS Load Balancer]
+      K8s --> SM[AWS Secrets Manager]
+    end
+
+    ALB --> User[End Users]
+```
+
 ## Infrastucture
 
 ### Terraform
 
-All resources are controlled via Terraform. State is stored in the `telekemp-terraform-state` S3 bucket. When building a new cluster you can log into a node and monitor the bootstrap process in `/var/log/bootstrap.log`. Once the bootstraping process is complete, the control-plane stores connection data in AWS Secrets Manager and the worker node(s) will join the cluster automatically:
+All resources are controlled via Terraform. State is stored in the `telekemp-terraform-state` S3 bucket. When building a new cluster you can log into a node and monitor the bootstrap process from `/var/log/bootstrap.log`. Once the bootstraping process is complete, the control-plane stores connection data in AWS Secrets Manager and the worker node(s) will join the cluster automatically:
 
 ```
 kubectl get nodes
@@ -69,7 +110,7 @@ BINDING=<MY_BINDING>
 ROLE=<RO_ROLE | RW_ROLE>  # If the exposed roles are not sufficient then you will need to create your own.
 
 openssl genrsa -out ${USER}.key 2048
-openssl req -new -key ${USER}.key -out ${USER}.csr -subj "/CN=${USER}>/O=${ORG}"
+openssl req -new -key ${USER}.key -out ${USER}.csr -subj "/CN=${USER}/O=${ORG}"
 sudo openssl x509 -req -in ${USER}.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out ${USER}.crt
 kubectl config set-credentials ${USER} --client-certificate=${USER}.crt --client-key ${USER}.key
 kubectl config set-context ${CONTEXT} --user=${USER} --cluster=kubernetes
@@ -116,19 +157,33 @@ Deploying the Helm chart can be done any number of ways but the simpliest option
 Internal applications such as Whisker and ArgoCD have not been exposed over the Internet for security purposes. You can access them by using the [access-tools](https://github.com/necrux/telekemp/tree/main/access-tools) to create an SSH tunnel.
 
 > [!NOTE]
-> If you opted to deploy ArgoCD the default user is `admin` and the temporary login credentials can be found in `/root/argocd_initial_password.txt` on the control-plane.
+> If you opted to deploy ArgoCD the default user is `admin` and the initial password will be displayed when running the [access script](https://github.com/necrux/telekemp/blob/main/access-tools/argocd-access.sh).
 
-## Roadmap
+## Project Roadmap
 
 * Fix ALB deployments for istio (disallowed for new AWS accounts; AWS ticket pending).
 * Configure DNS.
 * Set up cert-manager.
+* Configure GitHub Actions for Docker build.
 * Complete Teleport deployment.
 * Templatize the Istio charts.
 * Modularize the Terraform build.
 * Deploy a second app with a database backend in order to test Teleport integration.
+* Migrate much of the `user_data` to Ansible.
+
+## Production Ready Roadmap
+
+* Switch to EKS.
+* Switch the container registry to ECR.
+* Add a CI/CD pipeline for Terraform, e.g. Jenkins.
+* Clearly defined config managerment outside of IaC, e.g. Ansible.
+* Add unit tests.
+* Add tests to the Helm chart.
+* Move away from monlithic repos.
+* `etcd` snapshots
 
 ## Sources
 
 * [Istio: Version Compatibility](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases)
+* [ArgoCD: User Management](https://argo-cd.readthedocs.io/en/release-1.8/operator-manual/user-management/)
 * [Configure Flux](https://fluxcd.io/flux/installation/#configure-the-flux-instance)
