@@ -8,11 +8,11 @@ variable "state_bucket" {default = "telekemp-terraform-state" }
 # Global
 #--------------------------------------------------------------
 
-variable "account_id" { default = "109389764247" }
-#variable "account_id" { default = "" } # Main - Switching for ALB deployment.
+#variable "account_id" { default = "109389764247" } #NewAcct: Switching for NLB deployment.
+#variable "vpc_id"     { default = "vpc-0e9df176a53cb00cd" } #NewAcct: Switching for NLB deployment.
+variable "account_id" { default = "264405255203" }
 variable "region"     { default = "us-east-2" }
-variable "vpc_id"     { default = "vpc-0e9df176a53cb00cd" }
-#variable "vpc_id"     { default = "" } # Main - Switching for ALB deployment.
+variable "vpc_id"     { default = "vpc-e67eaa8f" }
 variable "zone_id"    { default = "Z05408313TYWO9EM9XWQL" }
 variable "key_name"   { default = "telekemp-admin" }
 
@@ -47,7 +47,8 @@ variable "base_packages" {
     "apt-transport-https",
     "ca-certificates",
     "curl",
-    "gpg"
+    "gpg",
+    "apache2-utils"
   ]
 }
 
@@ -64,7 +65,7 @@ variable "kube_packages" {
 #--------------------------------------------------------------
 
 variable "namespace" { default = "telekemp" }
-variable "ro_role"   { default = "telekemp-support" }
+variable "ro_role"   { default = "telekemp-qa" }
 variable "rw_role"   { default = "telekemp-devs" }
 
 #--------------------------------------------------------------

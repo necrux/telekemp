@@ -43,6 +43,14 @@ resource "aws_iam_policy" "lb_controller" {
           "elasticloadbalancing:*"
         ]
         Resource = "*"
+      },
+      # --- Required for first-time ELB usage ---
+      {
+        Effect = "Allow"
+        Action = [
+          "iam:CreateServiceLinkedRole"
+        ]
+        Resource = "*"
       }
     ]
   })
