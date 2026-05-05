@@ -15,7 +15,7 @@ echo -e "\nLogin Credentials can be found below.\n  The password displayed is th
 echo "User: admin"
 echo -e "Password: ${INITIAL_PW}\n"
 
-echo -e "\nOpening port. Go to http://localhost:${PORT} to access ArgoCD.\n\n"
+echo -e "\nOpening port. Go to https://localhost:${PORT} to access ArgoCD.\n\n"
 
 ssh -L ${PORT}:localhost:${PORT} -i $1 ubuntu@$2 \
   "kubectl port-forward service/argocd-server -n argocd ${PORT}:443"
