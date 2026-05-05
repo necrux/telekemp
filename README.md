@@ -32,15 +32,14 @@ flowchart LR
         Kubeadm[kubeadm Init]
       end
 
-      AWSInfra --> K8s[Kubernetes Cluster]
-      Kubeadm --> K8s
+      Kubeadm --> K8s[Kubernetes Cluster]
 
       Argo -->|Apply Manifests| K8s
-      K8s --> ALB[AWS Load Balancer]
+      K8s --> NLB[AWS Load Balancer]
       K8s --> SM[AWS Secrets Manager]
     end
 
-    ALB --> User[End Users]
+    NLB --> User[End Users]
 ```
 
 ## Infrastucture
@@ -55,19 +54,19 @@ kubectl get pods -A
 ```
 
 > [!WARNING]
-> This is not an EKS solution, meaning that it does not cleanly integrate with other AWS services out of the box: subnets, ALBs, etc. I have opted **not** to build a new VPC and related infrasture as part of this project meaning that you must **manually** tag the subnets in your desired VPC so that Istio can create the ALBs.
+> This is not an EKS solution, meaning that it does not cleanly integrate with other AWS services out of the box: subnets, NLBs, etc. I have opted **not** to build a new VPC and related infrasture as part of this project meaning that you must **manually** tag the subnets in your desired VPC so that Istio can create the NLBs.
 
 **Public Subnets**
 
 ```
-kubernetes.io/cluster/telekemp: [ owned | shared ]
+kubernetes.io/cluster/<cluster_name>: [ owned | shared ]
 kubernetes.io/role/elb: 1
 ```
 
 **Private Subets**
 
 ```
-kubernetes.io/cluster/telekemp: [ owned | shared ]
+kubernetes.io/cluster/<cluster_name>: [ owned | shared ]
 kubernetes.io/role/internal-elb: 1
 ```
 
@@ -87,8 +86,8 @@ Container build instructions for each application can be found in the [docker](h
 * [Staticly](https://hub.docker.com/repository/docker/necrux/staticly)
 
 ```
-docker tag staticly necrux/staticly:vX.X.X
-docker push necrux/staticly:vX.X.X
+docker build -t necrux/staticly:v1.X.X .
+docker push necrux/staticly:v1.X.X
 ```
 
 > [!TIP]
@@ -105,16 +104,16 @@ Terraform variables give you the option to bootstrap the cluster with a namespac
 ```
 USER=<NEW_USER>
 ORG=<MY_ORG>
+NAMESPACE=<NAMEPSACE>
 CONTEXT=<MY_CONTEXT>
-BINDING=<MY_BINDING>
 ROLE=<RO_ROLE | RW_ROLE>  # If the exposed roles are not sufficient then you will need to create your own.
 
 openssl genrsa -out ${USER}.key 2048
 openssl req -new -key ${USER}.key -out ${USER}.csr -subj "/CN=${USER}/O=${ORG}"
 sudo openssl x509 -req -in ${USER}.csr -CA /etc/kubernetes/pki/ca.crt -CAkey /etc/kubernetes/pki/ca.key -CAcreateserial -out ${USER}.crt
-kubectl config set-credentials ${USER} --client-certificate=${USER}.crt --client-key ${USER}.key
-kubectl config set-context ${CONTEXT} --user=${USER} --cluster=kubernetes
-kubectl create rolebinding ${BINDING} --role=${ROLE} --user=${USER}
+kubectl config set-credentials ${USER} --client-certificate=${USER}.crt --client-key ${USER}.key  --embed-certs=true
+kubectl config set-context ${CONTEXT} --user=${USER} --cluster=kubernetes --namespace=${NAMESPACE}
+kubectl -n ${NAMESPACE} create rolebinding ${ROLE}-binding --role=${ROLE} --user=${USER}
 ```
 
 ### Creating a Custom Role
@@ -144,9 +143,66 @@ kubectl apply -f <(my-new-role)
 Testing RBAC:
 
 ```
-kubectl config user-context ${CONTEXT}
+kubectl config use-context ${CONTEXT}
 kubectl -n kube-system get pods
 ```
+
+## RBAC w/ ArgoCD
+
+kubectl apply -f argocd-cm-static-user.yaml -n argocd
+kubectl apply -f argocd-rbac-cm.yaml -n argocd
+
+kubectl rollout restart deployment argocd-dex-server -n argocd
+kubectl rollout restart deployment argocd-server -n argocd
+
+cat argocd-cm-static-user.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: ""
+data:
+  url: https://127.0.0.1:8080
+  dex.config: |
+    connectors:
+    - type: staticPasswords
+      id: static
+      name: Static Users
+      config:
+        enableLogin: true
+        hash: $2y$12$nyjQ2QA2r1QQ7kwO5nyf.eQPAnmeXL4TTaZXiVpAdi4SflKtOua8u
+        users:
+        - email: root@necrux.com
+          username: necrux
+          userID: necrux
+          hash: $2y$12$nyjQ2QA2r1QQ7kwO5nyf.eQPAnmeXL4TTaZXiVpAdi4SflKtOua8u
+
+cat argocd-rbac-cm.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: argocd
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: ""
+data:
+  # Sets the fallback role for any logged-in user not matched by other rules
+  policy.default: role:readonly
+
+  # The CSV policy definitions
+  policy.csv: |
+    # Syntax: p, <role>, <resource>, <action>, <object>, <effect>
+    p, role:telekemp-devs, applications, *, */*, allow
+    p, role:telekemp-devs, clusters, get, *, allow
+    p, role:telekemp-devs, repositories, create, *, allow
+
+    # 2. Bind OIDC groups or users to roles
+    # Syntax: g, <subject>, <role>
+    g, my-org:necrux, role:telekemp-devs
+
+htpasswd -nbBC 12 "" "necrux" | tr -d ':\n'
 
 ## Deployment
 
@@ -159,17 +215,25 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 > [!NOTE]
 > If you opted to deploy ArgoCD the default user is `admin` and the initial password will be displayed when running the [access script](https://github.com/necrux/telekemp/blob/main/access-tools/argocd-access.sh).
 
+## Remaining Issues
+
+* Incomplete AWS integration
+  * Load Balancer Controller
+    * Not registering Target(s) to Target Group
+    * Not integrated with Route 53
+
 ## Project Roadmap
 
-* Fix ALB deployments for istio (disallowed for new AWS accounts; AWS ticket pending).
 * Configure DNS.
 * Set up cert-manager.
+* Helm Changes:
+  * Remove namespace creation from `user_data` and add a `Namespace` definition to the Helm charts *(`istio-injection` can be added there)*.
 * Configure GitHub Actions for Docker build.
 * Complete Teleport deployment.
 * Templatize the Istio charts.
 * Modularize the Terraform build.
 * Deploy a second app with a database backend in order to test Teleport integration.
-* Migrate much of the `user_data` to Ansible.
+* Migrate much of the `user_data` to Ansible or, where applicable, custom providers for Terraform.
 
 ## Production Ready Roadmap
 
@@ -177,6 +241,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Switch the container registry to ECR.
 * Add a CI/CD pipeline for Terraform, e.g. Jenkins.
 * Clearly defined config managerment outside of IaC, e.g. Ansible.
+* Configure ArgCO's dax server for authentication with OIDC.
 * Add unit tests.
 * Add tests to the Helm chart.
 * Move away from monlithic repos.
