@@ -1,0 +1,25 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: telekemp
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "staticly.fullname" . }}
+  namespace: telekemp
+spec:
+  secretName: {{ include "staticly.fullname" . }}
+  duration: 8760h   # 1 year
+  renewBefore: 360h # renew 15 days before expiry
+  commonName: staticly.local
+  dnsNames:
+    - staticly.necrux.com
+  issuerRef:
+    name: selfsigned-issuer
+    kind: Issuer

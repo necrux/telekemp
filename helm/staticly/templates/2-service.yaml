@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "staticly.fullname" . }}
+  namespace: telekemp
+  labels:
+    {{- include "staticly.labels" . | nindent 4 }}
+  #annotations:
+    #service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    #service.beta.kubernetes.io/aws-load-balancer-type: "external"
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "staticly.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      protocol: TCP
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}

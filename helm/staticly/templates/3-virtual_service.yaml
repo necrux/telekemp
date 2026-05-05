@@ -1,19 +1,19 @@
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
-  name: staticly
+  name: {{ include "staticly.fullname" . }}
   namespace: telekemp
 spec:
   hosts:
-  - "*"
+  - '*'
   gateways:
-  - staticly-gateway
+  - {{ include "staticly.fullname" . }}
   http:
   - match:
     - uri:
         prefix: /
     route:
     - destination:
-        host: staticly
+        host: {{ include "staticly.fullname" . }}
         port:
           number: 80
