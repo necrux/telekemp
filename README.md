@@ -30,7 +30,7 @@ flowchart LR
       %% Infra Pipeline
       subgraph Inner ["Build"]
         AWSInfra[AWS Infrastructure]
-        Kubeadm[kubeadm Init]
+        Kubeadm[kubeadm]
       end
 
       Kubeadm --> K8s[Kubernetes Cluster]
@@ -172,7 +172,6 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
   * Load Balancer Controller
     * Not registering Target(s) to Target Group.
     * Not integrated with Route 53.
-* Investigate if the control-plane connection token expires.
 
 ## Project Roadmap
 
@@ -186,6 +185,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Modularize the Terraform build.
 * Deploy a second app with a database backend in order to test Teleport integration.
 * Migrate much of the `user_data` to Ansible or, where applicable, custom providers for Terraform.
+* Create a cron on control-plane to refresh secrets every 12 hours; script is in `terraform/files`.
 
 ## Production Ready Roadmap
 

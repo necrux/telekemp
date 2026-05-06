@@ -99,6 +99,12 @@ resource "aws_instance" "worker" {
   depends_on = [
     aws_secretsmanager_secret.control_plane_secrets,
   ]
+
+  lifecycle {
+    ignore_changes = [
+      user_data,
+    ]
+  }
 }
 
 ### Security Groups
