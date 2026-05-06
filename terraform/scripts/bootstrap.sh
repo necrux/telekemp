@@ -16,7 +16,8 @@ CERT_MANAGER_VER="${CERT_MANAGER_VER}"
 POD_CIDR="${POD_CIDR}"
 BASE_PACKAGES="${BASE_PACKAGES}"
 KUBE_PACKAGES="${KUBE_PACKAGES}"
-GATEWAY="${GATEWAY}"
+NGINX="${NGINX}"
+ISTIO="${ISTIO}"
 ISTIO_VERSION="${ISTIO_VERSION}"
 TELEPORT="${TELEPORT}"
 TELEPORT_VERSION="${TELEPORT_VERSION}"
@@ -173,17 +174,6 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
     --kubeconfig=$${KUBE_ADMIN_FILE} \
     apply -f <(support-role)
 
-  #kubectl \
-  #  --kubeconfig=$${KUBE_ADMIN_FILE} \
-  #  create rolebinding ${DEV_ROLE}-binding \
-  #  --role=${DEV_ROLE} \
-  #  --namespace=${NAMESPACE}
-  #kubectl \
-  #  --kubeconfig=$${KUBE_ADMIN_FILE} \
-  #  create rolebinding ${SUPPORT_ROLE}-binding \
-  #  --role=${SUPPORT_ROLE} \
-  #  --namespace=${NAMESPACE}
-
   export KUBECONFIG=$${KUBE_ADMIN_FILE}
 
   # Install: cert-manager
@@ -197,8 +187,20 @@ if [ "${CONTROL_PLANE}" == "true" ]; then
       --create-namespace
   fi
 
+  # Install: nginx-ingress
+  if [ "$${NGINX}" == "true" ]; then
+    echo -e '\nInstalling nginx-ingress...\n'
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+    helm repo update
+
+    helm install ingress-nginx ingress-nginx/ingress-nginx \
+      --namespace ingress-nginx \
+      --set controller.publishService.enabled=true \
+      --create-namespace
+  fi
+
   # Install: istio
-  if [ "$${GATEWAY}" == "true" ]; then
+  if [ "$${ISTIO}" == "true" ]; then
     echo -e '\nInstalling Istio...\n'
     helm repo add istio https://istio-release.storage.googleapis.com/charts
     helm repo update

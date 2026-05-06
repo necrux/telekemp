@@ -73,6 +73,7 @@ variable "rw_role"   { default = "telekemp-devs" }
 #--------------------------------------------------------------
 
 variable "deploy_istio"         { default = true }
+variable "deploy_nginx_ingress" { default = true }
 variable "istio_version"        { default = "1.29.2" }
 variable "deploy_lb_controller" { default = true }
 variable "deploy_cert_manager"  { default = true }
