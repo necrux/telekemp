@@ -16,6 +16,7 @@ function update-chart {
             read -p 'Confirm (Y/n): ' ANS
             if [ "${ANS:0:1}" = "y" ]; then
                 sed -i "s/tag: .*/tag: \"${IMAGE}\"/g" ${CHART}
+                git add ${CHART}
                 return 0
             else
                 echo -e "\nAborting commit.\n"
