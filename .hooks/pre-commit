@@ -1,48 +1,85 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
-exec < /dev/tty
-
 BASE_PATH="$(git rev-parse --show-toplevel)"
-FILE_CHECK=(docker)
+FILE_CHECK=(docker/staticly/)
 declare -l ANS='n'
 
-function update-chart {
-    read -p 'Enter the new chart version: ' IMAGE
-    pushd "${BASE_PATH}" &>/dev/null
-        select env in $(ls helm); do
-            CHART="./helm/${env}/values.yaml"
-            echo -e "\nUpdate '${CHART} to: ${IMAGE}?\n"
-            read -p 'Confirm (Y/n): ' ANS
-            if [ "${ANS:0:1}" = "y" ]; then
-                sed -i "s/tag: .*/tag: \"${IMAGE}\"/g" ${CHART}
-                git add ${CHART}
-                return 0
-            else
-                echo -e "\nAborting commit.\n"
-                return 1
-            fi
-        done
-    popd
-
-}
-
-function check-docker {
+function docker-workflow {
     pushd "${BASE_PATH}" &>/dev/null
         for file in ${FILE_CHECK[@]}; do
             if git status --porcelain | grep -q ${file}; then
-                if ! git status --porcelain | grep -q "helm/.*/values.yaml"; then
-                    echo -e '\nIt appears that Docker may have been modified without updating Helm.\n'
-		            read -p 'Do you want to proceed with the commit? (Y/n): ' ANS
-		            if [ "${ANS:0:1}" != "y" ]; then
-                        update-chart
-	                else
-                        return 0
-                    fi
-	            fi
+                echo -e "\nI see you made changes to '${file}'. \n"
+                read -p 'Would you like to retag the image now? (Y/n): ' ANS < /dev/tty
+                if [ "${ANS:0:1}" == "y" ]; then
+                    tag-image
+                    STATUS=$?
+                else
+                    STATUS=0
+                fi
             fi
         done
-    popd
+    popd &>/dev/null
+
+    if [ ${STATUS} -ne 0 ]; then
+        return 1
+    else 
+        return 0
+    fi
 }
 
-check-docker
+function tag-image {
+    read -p 'Repo: ' REPO < /dev/tty
+    read -p 'Image: ' IMAGE < /dev/tty
+    read -p 'Tag: ' TAG < /dev/tty
+    read -p "Is this correct: ${REPO}/${IMAGE}:${TAG} (Y/n): " ANS < /dev/tty
+
+    if [ "${ANS:0:1}" == "y" ]; then
+        pushd "${BASE_PATH}/${file}" &>/dev/null
+            echo -e '\nBuilding Docker image...\n'
+            docker build -t ${REPO}/${IMAGE}:${TAG} .
+            echo -e '\nPushing Docker image...\n'
+            docker push ${REPO}/${IMAGE}:${TAG}
+            update-chart
+            STATUS=$?
+        popd &>/dev/null
+    else
+        echo -e "\nAborting commit.\n"
+        STATUS=$?
+    fi
+
+    if [ ${STATUS} -ne 0 ]; then
+        return 1
+    else 
+        return 0
+    fi
+}
+
+function update-chart {
+    pushd "${BASE_PATH}" &>/dev/null
+        echo -e "\nLet's update the Helm chart. Select the environment.\n"
+        select environment in $(ls helm); do
+            CHART="./helm/${environment}/values.yaml"
+            echo -e "\nUpdate '${CHART}' tag to '${TAG}'?\n"
+            read -p 'Confirm (Y/n): ' ANS < /dev/tty
+            if [ "${ANS:0:1}" == "y" ]; then
+                sed -i "s/tag: .*/tag: \"${TAG}\"/g" ${CHART}
+                git add ${CHART}
+                STATUS=0
+            else
+                echo -e "\nAborting commit.\n"
+                STATUS=1
+            fi
+            break
+        done < /dev/tty
+    popd &>/dev/null
+
+    if [ ${STATUS} -ne 0 ]; then
+        return 1
+    else 
+        return 0
+    fi
+}
+
+docker-workflow
+exit $?
