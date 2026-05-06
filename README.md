@@ -182,6 +182,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Configure GitHub Actions for Docker build.
 * Complete Teleport deployment.
 * Templatize the Istio charts.
+* Research Gateway API migration.
 * Modularize the Terraform build.
 * Deploy a second app with a database backend in order to test Teleport integration.
 * Migrate much of the `user_data` to Ansible or, where applicable, custom providers for Terraform.
