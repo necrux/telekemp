@@ -42,7 +42,7 @@ flowchart LR
 
     NLB --> User[End Users]
 ```
- *Note: GitHub Actions not yet implemented.*
+ *Note: GitHub Actions not yet implemented. Deployment currently use GitHub hooks.*
 
 ## Infrastucture
 
