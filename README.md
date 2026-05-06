@@ -2,7 +2,7 @@
 
 A full deployment of Kubernetes with `kubeadm` on EC2 instances. Telekemp is an exploration of the following technologies and how they interact: Teleport + Kubernetes + Nginx + MariaDB + Python (PHP?)
 
-Telekemp currently hosts 1 public website called [staticly](https://staticly.necrux.com). The website uses a self-signed certificate.
+Telekemp currently hosts 1 public website called [Staticly](https://staticly.necrux.com). The website uses a self-signed certificate.
 
 ## Overview
 
