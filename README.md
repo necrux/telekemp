@@ -42,6 +42,7 @@ flowchart LR
 
     NLB --> User[End Users]
 ```
+ *Note: GitHub Actions not yet implemented.*
 
 ## Infrastucture
 
@@ -171,6 +172,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
   * Load Balancer Controller
     * Not registering Target(s) to Target Group.
     * Not integrated with Route 53.
+* Investigate if the control-plane connection token expires.
 
 ## Project Roadmap
 
@@ -196,9 +198,11 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Move away from monlithic repos.
 * `etcd` snapshots
 * Implement a monitoring solution.
+* Mature deployment strategy, e.g. add canaries. 
 
 ## Sources
 
 * [Istio: Version Compatibility](https://istio.io/latest/docs/releases/supported-releases/#support-status-of-istio-releases)
 * [ArgoCD: User Management](https://argo-cd.readthedocs.io/en/release-1.8/operator-manual/user-management/)
 * [Configure Flux](https://fluxcd.io/flux/installation/#configure-the-flux-instance)
+* [RBAC: CSRs](https://lisowski0925.medium.com/using-kubernetes-csrs-and-rbac-for-cluster-user-authentication-and-authorization-9df5498655cd)
