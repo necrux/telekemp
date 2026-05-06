@@ -95,7 +95,7 @@ docker push necrux/staticly:v1.X.X
 *This will be moved to GitHub Actions shortly.*
 
 > [!TIP]
-> If the container tags increment be certain to update the corresponding value in the Helm [chart](https://github.com/necrux/telekemp/blob/ceb98299c3a4ac599cb872a61708ee7a0d8320a3/helm/staticly/values.yaml#L14)! There is a [pre-commit hook](https://github.com/necrux/telekemp/tree/main/.hooks/pre-commit) to help with this task; simply put the file in `.git/hooks/pre-cmmit`. This responsibilty will eventually live in GitHub Actions.
+> If the container tags increment be certain to update the corresponding value in the Helm [chart](https://github.com/necrux/telekemp/blob/ceb98299c3a4ac599cb872a61708ee7a0d8320a3/helm/staticly/values.yaml#L14)! There is a [pre-commit hook](https://github.com/necrux/telekemp/tree/main/.hooks/pre-commit) to help with this task; simply put the file in `.git/hooks/pre-commit`. This responsibilty will eventually live in GitHub Actions.
 
 #### Charts
 
