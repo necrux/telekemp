@@ -75,7 +75,7 @@ kubernetes.io/role/internal-elb: 1
 Kubernetes is bootstraped via Terraform using `user_data`; this includes basic cluster configuration. All associated scripts can be found [here](https://github.com/necrux/telekemp/tree/main/terraform/scripts).
 
 > [!NOTE]
-> Terraform is intended for cluster initialization only and any additional Kubernetes configuration should be moved outside of IaC. However many cluster initialization options have been exposed [here](https://github.com/necrux/telekemp/blob/main/terraform/variables.tf) for portability and training purposes.
+> Terraform is intended for cluster initialization only and any additional Kubernetes configuration should be moved outside of IaC, or custom providers where applicable. Many cluster initialization options have been exposed [here](https://github.com/necrux/telekemp/blob/main/terraform/variables.tf) for portability and training purposes.
 
 ### Applications
 
@@ -89,6 +89,8 @@ Container build instructions for each application can be found in the [docker](h
 docker build -t necrux/staticly:v1.X.X .
 docker push necrux/staticly:v1.X.X
 ```
+
+*This will be moved to GitHub Actions shortly.*
 
 > [!TIP]
 > If the container tags increment, be certain to update the corresponding value in the Helm [chart](https://github.com/necrux/telekemp/blob/ceb98299c3a4ac599cb872a61708ee7a0d8320a3/helm/staticly/values.yaml#L14)!
@@ -149,60 +151,7 @@ kubectl -n kube-system get pods
 
 ## RBAC w/ ArgoCD
 
-kubectl apply -f argocd-cm-static-user.yaml -n argocd
-kubectl apply -f argocd-rbac-cm.yaml -n argocd
-
-kubectl rollout restart deployment argocd-dex-server -n argocd
-kubectl rollout restart deployment argocd-server -n argocd
-
-cat argocd-cm-static-user.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argocd-cm
-  namespace: argocd
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: ""
-data:
-  url: https://127.0.0.1:8080
-  dex.config: |
-    connectors:
-    - type: staticPasswords
-      id: static
-      name: Static Users
-      config:
-        enableLogin: true
-        hash: $2y$12$nyjQ2QA2r1QQ7kwO5nyf.eQPAnmeXL4TTaZXiVpAdi4SflKtOua8u
-        users:
-        - email: root@necrux.com
-          username: necrux
-          userID: necrux
-          hash: $2y$12$nyjQ2QA2r1QQ7kwO5nyf.eQPAnmeXL4TTaZXiVpAdi4SflKtOua8u
-
-cat argocd-rbac-cm.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: argocd-rbac-cm
-  namespace: argocd
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: ""
-data:
-  # Sets the fallback role for any logged-in user not matched by other rules
-  policy.default: role:readonly
-
-  # The CSV policy definitions
-  policy.csv: |
-    # Syntax: p, <role>, <resource>, <action>, <object>, <effect>
-    p, role:telekemp-devs, applications, *, */*, allow
-    p, role:telekemp-devs, clusters, get, *, allow
-    p, role:telekemp-devs, repositories, create, *, allow
-
-    # 2. Bind OIDC groups or users to roles
-    # Syntax: g, <subject>, <role>
-    g, my-org:necrux, role:telekemp-devs
-
-htpasswd -nbBC 12 "" "necrux" | tr -d ':\n'
+ArgusCD ships with a Dax server for handling authention. You can setup local users, but you should configure OIDC with your preferred provider expose a callback URL for the best authentication experience.
 
 ## Deployment
 
@@ -219,13 +168,13 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 
 * Incomplete AWS integration
   * Load Balancer Controller
-    * Not registering Target(s) to Target Group
-    * Not integrated with Route 53
+    * Not registering Target(s) to Target Group.
+    * Not integrated with Route 53.
+* ArgoCD callback failure; conflicting with /.
 
 ## Project Roadmap
 
-* Configure DNS.
-* Set up cert-manager.
+* Configure DNS with CCM.
 * Helm Changes:
   * Remove namespace creation from `user_data` and add a `Namespace` definition to the Helm charts *(`istio-injection` can be added there)*.
 * Configure GitHub Actions for Docker build.
@@ -246,6 +195,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Add tests to the Helm chart.
 * Move away from monlithic repos.
 * `etcd` snapshots
+* Implement a monitoring solution.
 
 ## Sources
 
