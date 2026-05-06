@@ -17,7 +17,7 @@ spec:
   secretName: {{ include "staticly.fullname" . }}
   duration: 8760h   # 1 year
   renewBefore: 360h # renew 15 days before expiry
-  commonName: staticly.local
+  commonName: staticly.necrux.com
   dnsNames:
     - staticly.necrux.com
   issuerRef:
