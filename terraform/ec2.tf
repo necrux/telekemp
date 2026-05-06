@@ -81,7 +81,7 @@ resource "aws_instance" "worker" {
     FLUX             = tostring(var.deploy_flux)
   })
 
-  #associate_public_ip_address = false
+  associate_public_ip_address = false
   vpc_security_group_ids      = [aws_security_group.worker_sg.id]
   iam_instance_profile        = aws_iam_instance_profile.cluster_profile.name
 
