@@ -2,6 +2,7 @@
 
 A full deployment of Kubernetes with `kubeadm` on EC2 instances. Telekemp is an exploration of the following technologies and how they interact: Teleport + Kubernetes + Nginx + MariaDB + Python (PHP?)
 
+Telekemp currently hosts 1 public website called [staticly](https://staticly.necrux.com). The website uses a self-signed certificate.
 
 ## Overview
 
@@ -170,7 +171,6 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
   * Load Balancer Controller
     * Not registering Target(s) to Target Group.
     * Not integrated with Route 53.
-* ArgoCD callback failure; conflicting with /.
 
 ## Project Roadmap
 
