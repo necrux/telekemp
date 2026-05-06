@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -eo pipefail
+
+exec < /dev/tty
+
+BASE_PATH="$(git rev-parse --show-toplevel)"
+FILE_CHECK=(docker)
+declare -l ANS='n'
+
+function update-chart {
+    read -p 'Enter the new chart version: ' IMAGE
+    pushd "${BASE_PATH}" &>/dev/null
+        select env in $(ls helm); do
+            CHART="./helm/${env}/values.yaml"
+            echo -e "\nUpdate '${CHART} to: ${IMAGE}?\n"
+            read -p 'Confirm (Y/n): ' ANS
+            if [ "${ANS:0:1}" = "y" ]; then
+                sed -i "s/tag: .*/tag: \"${IMAGE}\"/g" ${CHART}
+                return 0
+            else
+                echo -e "\nAborting commit.\n"
+                return 1
+            fi
+        done
+    popd
+
+}
+
+function check-docker {
+    pushd "${BASE_PATH}" &>/dev/null
+        for file in ${FILE_CHECK[@]}; do
+            if git status --porcelain | grep -q ${file}; then
+                if ! git status --porcelain | grep -q "helm/.*/values.yaml"; then
+                    echo -e '\nIt appears that Docker may have been modified without updating Helm.\n'
+		            read -p 'Do you want to proceed with the commit? (Y/n): ' ANS
+		            if [ "${ANS:0:1}" != "y" ]; then
+                        update-chart
+	                else
+                        return 0
+                    fi
+	            fi
+            fi
+        done
+    popd
+}
+
+check-docker
