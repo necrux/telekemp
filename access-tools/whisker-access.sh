@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [ -z $@ ]; then
+if [ -z "$2" ]; then
   echo "Usage: $0 </path/to/key> <address>"
   exit 1
 fi
