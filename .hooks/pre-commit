@@ -81,5 +81,6 @@ function update-chart {
     fi
 }
 
-docker-workflow
-exit $?
+if git status --porcelain | grep -q ${file}; then
+    docker-workflow
+fi
