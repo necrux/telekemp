@@ -200,6 +200,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * `etcd` snapshots
 * Implement a monitoring solution.
 * Mature deployment strategy, e.g. add canaries. 
+* Configure HPA for application(s).
 
 ## Sources
 

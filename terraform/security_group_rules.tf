@@ -62,11 +62,24 @@ resource "aws_vpc_security_group_ingress_rule" "worker_ssh" {
   ip_protocol       = "tcp"
 }
 
-# Worker - NodePort Services
-resource "aws_vpc_security_group_ingress_rule" "worker_node_port" {
+# Worker - NodePort Services: TCP
+## Need to restrict to the LB SG (not currently under TF).
+resource "aws_vpc_security_group_ingress_rule" "worker_node_port_tcp" {
   security_group_id = aws_security_group.worker_sg.id
-  cidr_ipv4   = "0.0.0.0/0"
-  ip_protocol = "-1"
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 30000
+  to_port           = 32767
+  ip_protocol = "tcp"
+}
+
+# Worker - NodePort Services: UDP
+## Need to restrict to the LB SG (not currently under TF).
+resource "aws_vpc_security_group_ingress_rule" "worker_node_port_udp" {
+  security_group_id = aws_security_group.worker_sg.id
+  cidr_ipv4         = "0.0.0.0/0"
+  from_port         = 30000
+  to_port           = 32767
+  ip_protocol = "udp"
 }
 
 # Worker - Allow all traffic from self
