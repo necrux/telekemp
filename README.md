@@ -208,3 +208,4 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * [ArgoCD: User Management](https://argo-cd.readthedocs.io/en/release-1.8/operator-manual/user-management/)
 * [Configure Flux](https://fluxcd.io/flux/installation/#configure-the-flux-instance)
 * [RBAC: CSRs](https://lisowski0925.medium.com/using-kubernetes-csrs-and-rbac-for-cluster-user-authentication-and-authorization-9df5498655cd)
+* [AWS: VXLANCrossSubnet Support](https://oneuptime.com/blog/post/2026-03-13-configure-calico-networking-on-aws/view)
