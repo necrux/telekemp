@@ -8,11 +8,9 @@ variable "state_bucket" {default = "telekemp-terraform-state" }
 # Global
 #--------------------------------------------------------------
 
-#variable "account_id" { default = "109389764247" } #NewAcct: Switching for NLB deployment.
-#variable "vpc_id"     { default = "vpc-0e9df176a53cb00cd" } #NewAcct: Switching for NLB deployment.
-variable "account_id" { default = "264405255203" }
+variable "account_id" { default = "109389764247" }
 variable "region"     { default = "us-east-2" }
-variable "vpc_id"     { default = "vpc-e67eaa8f" }
+variable "vpc_id"     { default = "vpc-0e9df176a53cb00cd" }
 variable "zone_id"    { default = "Z05408313TYWO9EM9XWQL" }
 variable "key_name"   { default = "telekemp-admin" }
 
