@@ -179,6 +179,7 @@ Internal applications such as Whisker and ArgoCD have not been exposed over the 
 * Helm Changes:
   * Remove namespace creation from `user_data` and add a `Namespace` definition to the Helm charts *(`istio-injection` can be added there)*.
 * Configure GitHub Actions for Docker build.
+* Separate app configuration from Docker container.
 * Complete Teleport deployment.
 * Templatize the Istio charts.
 * Research Gateway API migration.
