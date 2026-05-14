@@ -13,6 +13,16 @@
   * Recorded sessions.
   * JIT access.
 
+## Architecture
+
+* Auth Service:
+  * Maintains certificate authorities.
+  * Stores cluster configurations.
+  * Collects cluster data.
+* Proxy Service
+* Agents
+  *  Sidecar daemons used to access service(s).
+
 ## Configuration
 
 ### Cluster Install (Single Instance)
@@ -62,5 +72,6 @@ tsh login --user=${USER} --proxy=${PROXY}
 ## Sources
 
 * [Teleport: Repo](https://github.com/gravitational/teleport)
+* [Teleport: Architecture](https://goteleport.com/docs/reference/architecture/)
 * [Teleport: Install](https://goteleport.com/docs/installation/single-machine/linux/)
 * [Teleport: Labs](https://goteleport.com/labs/)
