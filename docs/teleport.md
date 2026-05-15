@@ -21,7 +21,7 @@
   * Collects cluster data.
 * Proxy Service
 * Agents
-  *  Sidecar daemons used to access service(s).
+  *  Sidecar-style daemons used to access service(s).
 
 ## Configuration
 
